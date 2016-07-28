@@ -22,7 +22,7 @@ type RequestSetup struct {
   Params map[string]string
   Headers map[string]string
 }
-}
+
 
 
 func (c *Config) ConfigSetup() {
