@@ -11,12 +11,14 @@ import (
         "encoding/json"
         "crypto/sha256"
         "encoding/base64"
+        _"strings"
        )
 
 var base_wg sync.WaitGroup
 
 var config Config
 
+var app_config AppConfig
 
 var alpha = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
@@ -25,7 +27,7 @@ type Config struct {
   Concurrency int
   EnvConvig EnvSetup
   RangeVaribales []string
-  AppConfig AppConfig
+  // AppConfig AppConfig
 }
 
 
@@ -50,7 +52,7 @@ type RequestSetup struct {
   UserName string
   Email string
   SkipHeader bool
-  AppConfig AppConfig
+  // AppConfig AppConfig
 }
 
 type TestRequest struct {
@@ -103,7 +105,11 @@ func (r *RequestSetup) DoGet(){
 
 func (r *RequestSetup) DoPost() (*http.Response,error){
   client := &http.Client{}
+  fmt.Println(r.Url)
+  // var data = `{"app_secret":"8YHsvw7fuylbLr5FevrFAsRC/v2sH5X8i9aWODH76908GxhIE/+jDj0cVJft+zTx2WkQmxiGM06KAnBtG1C7gg=="}`
   req, _ := http.NewRequest("POST", r.Url,  bytes.NewBufferString(r.Params))
+  req.Header.Set("Content-Type", "application/json")
+  // req, _ := http.NewRequest("POST", r.Url,  bytes.NewBufferString(r.Params))
   if r.SkipHeader != true{
 
   }
@@ -137,13 +143,11 @@ func (c *Config)Register() {
   if err != nil {
     fmt.Printf("Error %s \n",err)
   }else {
-    var app AppConfig
     body, err := ioutil.ReadAll(response.Body)
-    if err = json.Unmarshal([]byte(body), &app); err != nil {
+    if err = json.Unmarshal([]byte(body), &app_config); err != nil {
           panic(err)
       }
-    c.AppConfig = app
-    fmt.Println(app)
+    fmt.Println(app_config)
   }
 }
 // register a user based on appkey and appid
@@ -155,7 +159,6 @@ func (c *Config)SignUp(){
   r.Email = fmt.Sprintf("vivek+%s-%s@jurni.me",srand(8),rand_num)
   r.SkipHeader = false
   r.Url = config.EnvConvig.BaseUri + "/signup"
-  r.AppConfig = c.AppConfig
   // params := map[string]string{
   //   "username": r.UserName,
   //   "password":   r.Password,
@@ -176,7 +179,7 @@ func StepUp(env string, no int) {
   config.ConfigSetup()
   // config.TestGorotine()
   config.Register()
-  fmt.Println(config.AppConfig)
+  // fmt.Println(config.AppConfig)
   // config.SignUp()
 }
 
@@ -205,8 +208,8 @@ func EncryptPassword2(digest_key string) string {
 
 // func (r *RequestSetup)BuildHeader(req *http.Request ) {
 //   nonce := string(10000 + rand.Intn(89999))
-//   auth_key := EncryptPassword2(fmt.Sprintf("%v-%v-%v-%v", r.ApiKey, r.ApiSecret,nonce,r.Url))
-//   req.Header.Set("X-Api-Key", r.ApiKey)
+//   auth_key := EncryptPassword2(fmt.Sprintf("%v-%v-%v-%v", app_config.ApiKey, app_config.ApiSecret,nonce,r.Url))
+//   req.Header.Set("X-Api-Key", app_config.ApiKey)
 //   req.Header.Set("X-Api-Nonce", nonce)
 //   req.Header.Set("Authorization",auth_key)
 //   req.Header.Set("X-Session-ID",r.SessionId)
