@@ -13,6 +13,7 @@ import (
         "crypto/sha256"
         "encoding/base64"
         "net/url"
+        "os"
         _"strings"
        )
 
@@ -87,13 +88,15 @@ type TestRequest struct {
 
 // appliication starts here
 func StepUp(env string, no int, post_no int) {
-  config.EnvVariable = env
-  config.Concurrency = no
-  config.PostConcurrency = post_no
-  config.ConfigSetup()
-  // config.TestGorotine()
-  config.Register()
-  config.TriggerLoadTest()
+   pwd, err := os.Getwd()
+   fmt.Println(pwd,err)
+  // config.EnvVariable = env
+  // config.Concurrency = no
+  // config.PostConcurrency = post_no
+  // config.ConfigSetup()
+  // // config.TestGorotine()
+  // config.Register()
+  // config.TriggerLoadTest()
 }
 
 func (c *Config)TriggerLoadTest() {
