@@ -3,6 +3,7 @@ package main
 import (
   "gopkg.in/alecthomas/kingpin.v2"
   "github.com/agiratech-arun/go-load-test/jurniapi_v2_client"
+  "os"
   )
 
 
@@ -13,7 +14,9 @@ var post_per_user = kingpin.Flag("p","Specify an number of post per users").Requ
 
 func main() {
   kingpin.Parse()
-  jurniapi_v2_client.StepUp(*environment, *concoreny, *post_per_user)
+  pwd,_ := os.Getwd()
+  pwd += "/videos/SampleVideo_1280x720_1mb.mp4"
+  jurniapi_v2_client.StepUp(*environment, *concoreny, *post_per_user,pwd)
 }
 
 

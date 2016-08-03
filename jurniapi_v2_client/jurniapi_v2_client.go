@@ -12,8 +12,8 @@ import (
         "encoding/json"
         "crypto/sha256"
         "encoding/base64"
+        "os/exec"
         "net/url"
-        "os"
         _"strings"
        )
 
@@ -28,6 +28,8 @@ var commenter SignUpSession
 var alpha = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
 var key = "8YHsvw7fuylbLr5FevrFAsRC/v2sH5X8i9aWODH76908GxhIE/+jDj0cVJft+zTx2WkQmxiGM06KAnBtG1C7gg=="
+
+var VideoUrl = ""
 
 type Config struct {
   EnvVariable string
@@ -44,6 +46,7 @@ type SignUpSession struct {
   UserId string `json:"user_id"`
   SessionId string `json:"session_id"`
   Error string `json:"error"`
+  Post Post
 }
 
 type AppConfig struct {
@@ -87,31 +90,45 @@ type TestRequest struct {
 
 
 // appliication starts here
-func StepUp(env string, no int, post_no int) {
-   pwd, err := os.Getwd()
-   fmt.Println(pwd,err)
-  // config.EnvVariable = env
-  // config.Concurrency = no
-  // config.PostConcurrency = post_no
-  // config.ConfigSetup()
-  // // config.TestGorotine()
-  // config.Register()
-  // config.TriggerLoadTest()
+func StepUp(env string, no int, post_no int,pwd string) {
+  PrintSatement("Load Testing Steup")
+  VideoUrl = pwd
+  config.EnvVariable = env
+  config.Concurrency = no
+  config.PostConcurrency = post_no
+  config.ConfigSetup()
+  // config.TestGorotine()
+  config.Register()
+  config.TriggerLoadTest()
 }
 
 func (c *Config)TriggerLoadTest() {
+  PrintSatement("Load Testing Started")
+  fmt.Println(VideoUrl)
   commenter.CommenterSignUp()
-  for i:=0;i<c.Concurrency;i++ {
-    var sign_up SignUpSession
+  Concurrency()
+}
+
+
+func Concurrency() {
+  for i:=0;i<config.Concurrency;i++ {
+    var s SignUpSession
     base_wg.Add(1)
-    go sign_up.UserSignUp()
+    go s.TrigegrConcurrency()
   }
   base_wg.Wait()
 }
 
+func (s *SignUpSession) TrigegrConcurrency() {
+  defer base_wg.Done()
+  // s.UserSignUp()
+  s.Login("gkLz-20205","jurni123")
+  s.PostTrigger()
+}
 
 func (c *Config) ConfigSetup() {
   // c.RangeVaribales =
+  PrintSatement("Env Configuration")
   c.EnvConvig.DeviceId = srand(64)
   if c.EnvVariable == "staging" {
     c.EnvConvig.BaseUri = "https://api-v2-staging.jurni.me/v2"
@@ -131,7 +148,7 @@ func (c *Config) Test(){
 
 func (r *RequestSetup) DoGet() (*http.Response,error){
   // defer base_wg.Done()
-  fmt.Printf("== -- url = %s\n",r.Url)
+  PrintSatement("Get Request == -- url "+r.Url)
   client := &http.Client{}
   req, _ := http.NewRequest("GET", r.Url, nil)
   fmt.Println("%T",req)
@@ -145,7 +162,7 @@ func (r *RequestSetup) DoGet() (*http.Response,error){
 
 func (r *RequestSetup) DoPost() (*http.Response,error){
   client := &http.Client{}
-  fmt.Println(r.Url)
+  PrintSatement("Post Request == -- url "+r.Url)
   req, _ := http.NewRequest("POST", r.Url,  bytes.NewBufferString(r.Params))
   req.Header.Set("Content-Type", "application/json")
   if r.SkipHeader != true{
@@ -157,6 +174,7 @@ func (r *RequestSetup) DoPost() (*http.Response,error){
 
 // test the application to working
 func (c *Config)TestGorotine(){
+  PrintSatement("Api Test Goes")
   fmt.Println("-- test starting")
   var r RequestSetup
   r.Url = config.EnvConvig.BaseUri + "/test"
@@ -168,6 +186,7 @@ func (c *Config)TestGorotine(){
 }
 // registeration for app to get appkey and appid
 func (c *Config)Register() {
+  PrintSatement("Api Key Register")
   var r RequestSetup
   params := map[string]string{
     "app_secret": key}
@@ -188,11 +207,9 @@ func (c *Config)Register() {
 
 // register a user based on appkey and appid
 func (s *SignUpSession) UserSignUp(){
-  defer base_wg.Done()
+  PrintSatement("User SignUp")
   var r RequestSetup
   r.SignUpParams()
-  var post_wg sync.WaitGroup
-  fmt.Printf("%T",post_wg)
   response,err := r.DoPost()
   if err != nil {
     fmt.Printf("Error %s \n",err)
@@ -202,16 +219,47 @@ func (s *SignUpSession) UserSignUp(){
           panic(err)
       }
     fmt.Println(s)
-
-    for i:=0;i<config.PostConcurrency;i++ {
-      post_wg.Add(1)
-      go s.NewPost(&post_wg)
-    }
-    post_wg.Wait()
   }
 }
 
+// Login user name
+func (s *SignUpSession) Login(username string,pwd string) {
+  PrintSatement(fmt.Sprintf("User %v Login",username))
+  var r RequestSetup
+  r.UserName = username
+  r.Password = pwd
+  r.SkipHeader = false
+  r.Url = config.EnvConvig.BaseUri + "/users/login"
+  params := map[string]string{
+    "username": r.UserName,
+    "password":   r.Password,
+    "device_id": config.EnvConvig.DeviceId,
+  }
+  data,_ := json.Marshal(params)
+  r.Params = string(data)
+  response,err := r.DoPost()
+  if err != nil {
+    fmt.Printf("Error %s \n",err)
+  }else {
+    body, err := ioutil.ReadAll(response.Body)
+    if err = json.Unmarshal([]byte(body), &s); err != nil {
+          panic(err)
+      }
+    fmt.Println(s)
+  }
+}
+
+func (s *SignUpSession) PostTrigger() {
+  var post_wg sync.WaitGroup
+  for i:=0;i<config.PostConcurrency;i++ {
+    post_wg.Add(1)
+    go s.NewPost(&post_wg)
+  }
+  post_wg.Wait()
+}
+
 func (s *SignUpSession) CommenterSignUp(){
+  PrintSatement("Commenter SignUp")
   var r RequestSetup
   r.SignUpParams()
   response,err := r.DoPost()
@@ -228,6 +276,7 @@ func (s *SignUpSession) CommenterSignUp(){
 
 //
 func (s *SignUpSession) NewPost(post_wg *sync.WaitGroup ) {
+  PrintSatement("Post Create")
   defer post_wg.Done()
   var r RequestSetup
   r.Url = fmt.Sprintf("%s/users/%v/posts/new",config.EnvConvig.BaseUri,s.UserId)
@@ -245,11 +294,14 @@ func (s *SignUpSession) NewPost(post_wg *sync.WaitGroup ) {
           panic(err)
       }
     fmt.Println(p)
-    s.ShowPost(&p)
+    s.Post = p
+    p.UploadVideo()
   }
 }
 
+
 func (s *SignUpSession) ShowPost(p *Post){
+  PrintSatement("Show Post")
   var r RequestSetup
   r.Url = fmt.Sprintf("%v/users/%v/posts/%v",config.EnvConvig.BaseUri,s.UserId,p.PostId)
   params := map[string]string{}
@@ -271,6 +323,7 @@ func (s *SignUpSession) ShowPost(p *Post){
 
 func (s *SignUpSession) NewComment(p *Post) {
   // defer post_wg.Done()
+  PrintSatement("Create Comment")
   var r RequestSetup
   r.Url = fmt.Sprintf("%s/users/%v/posts/%v/comments/new",config.EnvConvig.BaseUri,s.UserId,p.PostId)
   params := map[string]string{}
@@ -360,6 +413,15 @@ func (r *RequestSetup) SignUpParams() {
   r.Params = string(data)
 }
 
-// func PrintSatement(val) {
+func (p *Post) UploadVideo(){
+  PrintSatement("Upload Post")
+  uri,_ := url.Parse(p.PostVideoUri)
+  comment := fmt.Sprintf("curl -X PUT -T %v '%v'",VideoUrl,uri.String())
+  fmt.Println(exec.Command(comment).Run())
+}
 
-// }
+func PrintSatement(val string) {
+  fmt.Printf("\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++\n")
+  fmt.Printf("    %v    ",val)
+  fmt.Printf("\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
+}
