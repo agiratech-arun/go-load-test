@@ -15,7 +15,7 @@ var post_per_user = kingpin.Flag("p","Specify an number of post per users").Requ
 func main() {
   kingpin.Parse()
   pwd,_ := os.Getwd()
-  pwd += "/videos/SampleVideo_1280x720_1mb.mp4"
+  pwd += "/videos/stepteen1.mov"
   jurniapi_v2_client.StepUp(*environment, *concoreny, *post_per_user,pwd)
 }
 

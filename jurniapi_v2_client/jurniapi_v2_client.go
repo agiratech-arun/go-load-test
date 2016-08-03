@@ -12,8 +12,9 @@ import (
         "encoding/json"
         "crypto/sha256"
         "encoding/base64"
-        "os/exec"
+        _"os/exec"
         "net/url"
+        "github.com/codeskyblue/go-sh"
         _"strings"
        )
 
@@ -321,7 +322,7 @@ func (s *SignUpSession) ShowPost(p *Post){
   }
 }
 
-func (s *SignUpSession) NewComment(p *Post) {
+func (s *SignUpSession) NewComment() {
   // defer post_wg.Done()
   PrintSatement("Create Comment")
   var r RequestSetup
@@ -416,8 +417,8 @@ func (r *RequestSetup) SignUpParams() {
 func (p *Post) UploadVideo(){
   PrintSatement("Upload Post")
   uri,_ := url.Parse(p.PostVideoUri)
-  comment := fmt.Sprintf("curl -X PUT -T %v '%v'",VideoUrl,uri.String())
-  fmt.Println(exec.Command(comment).Run())
+  // comment := fmt.Sprintf("curl -X PUT -T %v '%v'",VideoUrl,uri.String())
+  fmt.Println(sh.Command("curl", "-X", "PUT", "-T",  VideoUrl, uri.String()).Run())
 }
 
 func PrintSatement(val string) {
