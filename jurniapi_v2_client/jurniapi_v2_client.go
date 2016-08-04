@@ -108,7 +108,7 @@ type TestRequest struct {
 
 
 // appliication starts here
-func StepUp(env string, no int, post_no int,pwd string,username string, password string) {
+func StepUp(env string, no int, post_no int,pwd string) {
   PrintSatement("Load Testing Steup")
   VideoUrl = pwd
   username = username

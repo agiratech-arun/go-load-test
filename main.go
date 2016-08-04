@@ -11,11 +11,10 @@ var environment = kingpin.Flag("e","Specify an environment by default it is deve
 var concoreny = kingpin.Flag("c","Specify an number of concoreny").Required().Int()
 var post_per_user = kingpin.Flag("p","Specify an number of post per users").Required().Int()
 
-
 func main() {
   kingpin.Parse()
   pwd,_ := os.Getwd()
-  pwd += "/videos/stepteen1.mov"
+  pwd += "/videos/gyro_toy.mp4"
   jurniapi_v2_client.StepUp(*environment, *concoreny, *post_per_user,pwd)
 }
 
