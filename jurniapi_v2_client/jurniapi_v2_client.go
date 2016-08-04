@@ -24,13 +24,17 @@ var config Config
 
 var app_config AppConfig
 
-var commenter SignUpSession
+var commenter UserSession
 
 var alpha = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
 var key = "8YHsvw7fuylbLr5FevrFAsRC/v2sH5X8i9aWODH76908GxhIE/+jDj0cVJft+zTx2WkQmxiGM06KAnBtG1C7gg=="
 
 var VideoUrl = ""
+
+var username = ""
+
+var password = ""
 
 type Config struct {
   EnvVariable string
@@ -42,12 +46,13 @@ type Config struct {
 }
 
 
-type SignUpSession struct {
+type UserSession struct {
   Status int
   UserId string `json:"user_id"`
   SessionId string `json:"session_id"`
   Error string `json:"error"`
   Post Post
+  Comment Comment
 }
 
 type AppConfig struct {
@@ -74,6 +79,18 @@ type RequestSetup struct {
   // AppConfig AppConfig
 }
 
+type Comment struct {
+  Status int
+  Error string `json:"error"`
+  CommentId string `json:"comment_id"`
+  IsPublic string `json:"is_public"`
+  CommentVideoUri string `json:"comment_video_uri"`
+  // Created string `json:"created_at"`
+  BackgroundOn bool `json:"background_on"`
+  JobId string `json:"job_id"`
+  Commenter map[string]string `json:"commenter"`
+}
+
 type Post struct {
   Status int
   Error string `json:"error"`
@@ -91,40 +108,63 @@ type TestRequest struct {
 
 
 // appliication starts here
-func StepUp(env string, no int, post_no int,pwd string) {
+func StepUp(env string, no int, post_no int,pwd string,username string, password string) {
   PrintSatement("Load Testing Steup")
   VideoUrl = pwd
+  username = username
+  fmt.Println(username,password)
+  password = password
   config.EnvVariable = env
   config.Concurrency = no
   config.PostConcurrency = post_no
   config.ConfigSetup()
   // config.TestGorotine()
   config.Register()
-  config.TriggerLoadTest()
+  DumpUser(1)
+  // config.TriggerLoadTest()
 }
+
+
 
 func (c *Config)TriggerLoadTest() {
   PrintSatement("Load Testing Started")
   fmt.Println(VideoUrl)
-  commenter.CommenterSignUp()
+  // commenter.CommenterSignUp()
   Concurrency()
+}
+
+func DumpUser(n int) {
+  config.Register()
+  var dump_wg sync.WaitGroup
+  for i:=0; i<n; i++ {
+    dump_wg.Add(1)
+    go UserSignUp(i, &dump_wg)
+  }
 }
 
 
 func Concurrency() {
   for i:=0;i<config.Concurrency;i++ {
-    var s SignUpSession
+    var s UserSession
     base_wg.Add(1)
     go s.TrigegrConcurrency()
   }
   base_wg.Wait()
 }
 
-func (s *SignUpSession) TrigegrConcurrency() {
+func (s *UserSession) TrigegrConcurrency() {
   defer base_wg.Done()
   // s.UserSignUp()
-  s.Login("gkLz-20205","jurni123")
-  s.PostTrigger()
+  commenter.Login("arun_agira","jurni@123")
+  // s.Post.PostId = "57a1f75c69702d7c67360000"
+  // s.Fellow()
+  // fmt.Println("SessionId",s.SessionId)
+  // s.Login("pwXS-64863","jurni123")
+  // s.PostTrigger()
+  // s.ShowPost()
+  // commenter.Post = s.Post
+  commenter.Post.PostId = "57a2f71e69702d2c3b1e0000"
+  commenter.NewComment()
 }
 
 func (c *Config) ConfigSetup() {
@@ -207,24 +247,37 @@ func (c *Config)Register() {
 }
 
 // register a user based on appkey and appid
-func (s *SignUpSession) UserSignUp(){
+func UserSignUp(i int, dump_wg *sync.WaitGroup){
+  defer dump_wg.Done()
   PrintSatement("User SignUp")
-  var r RequestSetup
-  r.SignUpParams()
-  response,err := r.DoPost()
+  index := strconv.Itoa(i)
+  params := map[string]string{
+    "username": "jurni_test"+index,
+    "password":  "jurni123",
+    "email": "jurni_test"+index + "@jurni.me",
+    "device_id": config.EnvConvig.DeviceId,
+  }
+  data,_ := json.Marshal(params)
+
+  var req RequestSetup
+  req.SkipHeader = false
+  req.Url = config.EnvConvig.BaseUri + "/signup"
+  req.Params = string(data)
+  response,err := req.DoPost()
   if err != nil {
     fmt.Printf("Error %s \n",err)
   }else {
     body, err := ioutil.ReadAll(response.Body)
-    if err = json.Unmarshal([]byte(body), &s); err != nil {
-          panic(err)
-      }
-    fmt.Println(s)
+    var test_data interface{}
+    if err = json.Unmarshal([]byte(body), &test_data); err != nil {
+      panic(err)
+    }
+    fmt.Println(test_data)
   }
 }
 
 // Login user name
-func (s *SignUpSession) Login(username string,pwd string) {
+func (s *UserSession) Login(username string,pwd string) {
   PrintSatement(fmt.Sprintf("User %v Login",username))
   var r RequestSetup
   r.UserName = username
@@ -250,7 +303,7 @@ func (s *SignUpSession) Login(username string,pwd string) {
   }
 }
 
-func (s *SignUpSession) PostTrigger() {
+func (s *UserSession) PostTrigger() {
   var post_wg sync.WaitGroup
   for i:=0;i<config.PostConcurrency;i++ {
     post_wg.Add(1)
@@ -259,7 +312,7 @@ func (s *SignUpSession) PostTrigger() {
   post_wg.Wait()
 }
 
-func (s *SignUpSession) CommenterSignUp(){
+func (s *UserSession) CommenterSignUp(){
   PrintSatement("Commenter SignUp")
   var r RequestSetup
   r.SignUpParams()
@@ -276,7 +329,7 @@ func (s *SignUpSession) CommenterSignUp(){
 }
 
 //
-func (s *SignUpSession) NewPost(post_wg *sync.WaitGroup ) {
+func (s *UserSession) NewPost(post_wg *sync.WaitGroup ) {
   PrintSatement("Post Create")
   defer post_wg.Done()
   var r RequestSetup
@@ -296,77 +349,79 @@ func (s *SignUpSession) NewPost(post_wg *sync.WaitGroup ) {
       }
     fmt.Println(p)
     s.Post = p
-    p.UploadVideo()
+    UploadVideo(VideoUrl,p.PostVideoUri)
   }
 }
 
 
-func (s *SignUpSession) ShowPost(p *Post){
+func (s *UserSession) ShowPost(){
+  p := s.Post
   PrintSatement("Show Post")
   var r RequestSetup
   r.Url = fmt.Sprintf("%v/users/%v/posts/%v",config.EnvConvig.BaseUri,s.UserId,p.PostId)
   params := map[string]string{}
   data,_ := json.Marshal(params)
   r.Params = string(data)
-  response,err := r.DoPost()
-  if err != nil {
-    fmt.Printf("Error %s \n",err)
-  }else {
-    var test_data interface{}
-    body, err := ioutil.ReadAll(response.Body)
-    if err = json.Unmarshal([]byte(body), &test_data); err != nil {
-          panic(err)
-      }
-    fmt.Println(test_data)
-    // s.Fellow()
-  }
-}
-
-func (s *SignUpSession) NewComment() {
-  // defer post_wg.Done()
-  PrintSatement("Create Comment")
-  var r RequestSetup
-  r.Url = fmt.Sprintf("%s/users/%v/posts/%v/comments/new",config.EnvConvig.BaseUri,s.UserId,p.PostId)
-  params := map[string]string{}
-  data,_ := json.Marshal(params)
-  r.Params = string(data)
-  r.SessionId = s.SessionId
   response,err := r.DoGet()
   if err != nil {
     fmt.Printf("Error %s \n",err)
   }else {
-    var test_data interface{}
+    var p Post
     body, err := ioutil.ReadAll(response.Body)
-    if err = json.Unmarshal([]byte(body), &test_data); err != nil {
+    if err = json.Unmarshal([]byte(body), &p); err != nil {
           panic(err)
       }
-    fmt.Println(test_data)
+    fmt.Println(p)
+    s.Post = p
+    UploadVideo(VideoUrl,p.PostVideoUri)
     // s.Fellow()
   }
 }
 
-// func (s *SignUpSession) Fellow () {
-//   var r RequestSetup
-//   var commetor SignUpSession
-//   commetor.SignUp()
-//   params := map[string]string{
-//     "topic_spec": "all"}
-//   r.Url = fmt.Sprintf("%v/users/%v/follow/%v",config.EnvConvig.BaseUri,s.UserId,s.UserId)
-//   data,_ := json.Marshal(params)
-//   r.Params = string(data)
-//   r.SessionId = s.SessionId
-//   response,err := r.DoPost()
-//   if err != nil {
-//     fmt.Printf("Error %s \n",err)
-//   }else {
-//     body, err := ioutil.ReadAll(response.Body)
-//     var s1 SignUpSession
-//     if err = json.Unmarshal([]byte(body), &s1); err != nil {
-//       panic(err)
-//     }
-//     fmt.Println(s1)
-//   }
-// }
+func (s *UserSession) NewComment() {
+  // defer post_wg.Done()
+  PrintSatement("Create Comment")
+  var r RequestSetup
+  r.Url = fmt.Sprintf("%s/users/%v/posts/%v/comments/new",config.EnvConvig.BaseUri,s.UserId,s.Post.PostId)
+  params := map[string]string{}
+  data,_ := json.Marshal(params)
+  r.Params = string(data)
+  r.SessionId = s.SessionId
+  response,err := r.DoPost()
+  if err != nil {
+    fmt.Printf("Error %s \n",err)
+  }else {
+    var c Comment
+    body, err := ioutil.ReadAll(response.Body)
+    if err = json.Unmarshal([]byte(body), &c); err != nil {
+      panic(err)
+    }
+    fmt.Println(c)
+    s.Comment = c
+    UploadVideo(VideoUrl,c.CommentVideoUri)
+  }
+}
+
+func (s *UserSession) Fellow () {
+  var r RequestSetup
+  params := map[string]string{
+    "topic_spec": "all"}
+  r.Url = fmt.Sprintf("%v/users/%v/follow/%v",config.EnvConvig.BaseUri,s.UserId,"576cba2d69702d6518420000")
+  data,_ := json.Marshal(params)
+  r.Params = string(data)
+  r.SessionId = s.SessionId
+  response,err := r.DoPost()
+  if err != nil {
+    fmt.Printf("Error %s \n",err)
+  }else {
+    body, err := ioutil.ReadAll(response.Body)
+    var test_data interface{}
+    if err = json.Unmarshal([]byte(body), &test_data); err != nil {
+      panic(err)
+    }
+    fmt.Println(test_data)
+  }
+}
 
 
 func srand(size int) string {
@@ -386,11 +441,17 @@ func EncryptKey(digest_key string) string {
 
 func (r *RequestSetup)BuildHeader(req *http.Request) {
   rand.Seed(time.Now().UTC().UnixNano())
-  nonce := string(10000 + rand.Intn(89999))
+  nonce := strconv.Itoa(10000 + rand.Intn(89999))
   auth_key := EncryptKey(fmt.Sprintf("%v-%v-%v-%v", app_config.ApiKey, app_config.ApiSecret,nonce,r.Url))
   req.Header.Set("X-Api-Key", app_config.ApiKey)
   req.Header.Set("X-Api-Nonce", nonce)
   req.Header.Set("Authorization",auth_key)
+  fmt.Println("~~~~~~~~~~~~~~Headers~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+  fmt.Println("Authorization",auth_key)
+  fmt.Println("X-Api-Nonce",nonce)
+  fmt.Println("X-Api-Key",app_config.ApiKey)
+  fmt.Println("X-Session-ID",r.SessionId)
+  fmt.Println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
   if r.SessionId != "" {
     req.Header.Set("X-Session-ID",r.SessionId)
   }
@@ -414,11 +475,11 @@ func (r *RequestSetup) SignUpParams() {
   r.Params = string(data)
 }
 
-func (p *Post) UploadVideo(){
-  PrintSatement("Upload Post")
-  uri,_ := url.Parse(p.PostVideoUri)
+func UploadVideo(file_path string, url_string string){
+  PrintSatement("Uploading")
+  uri,_ := url.Parse(url_string)
   // comment := fmt.Sprintf("curl -X PUT -T %v '%v'",VideoUrl,uri.String())
-  fmt.Println(sh.Command("curl", "-X", "PUT", "-T",  VideoUrl, uri.String()).Run())
+  fmt.Println(sh.Command("curl", "-X", "PUT", "-T",  file_path, uri.String()).Run())
 }
 
 func PrintSatement(val string) {
