@@ -150,13 +150,12 @@ func (c *Config)Register() {
   r.Url = config.EnvConvig.BaseUri + "/register"
   response,err := r.DoPost()
   if err != nil {
-    fmt.Printf("Error %s \n",err)
+    fmt.Printf("Registering App Failed: %s \n",err)
   }else {
     body, err := ioutil.ReadAll(response.Body)
     if err = json.Unmarshal([]byte(body), &app_config); err != nil {
           panic(err)
       }
-    fmt.Println(app_config)
   }
 }
 
@@ -185,7 +184,6 @@ func ScenarioTwo(n int, limit string) {
   var s UserSession
   s.Login(username,password)
   s.SearchUser(limit)
-  fmt.Println("Login Users",len(login_users))
   for _,user := range login_users {
     feed_metric_wg.Add(1)
     new_user := user
@@ -206,7 +204,7 @@ func (user *User)ScenarioOneFlow(scenario_1_wg *sync.WaitGroup, post Post) {
     go session.CommentTrigger(&post_wg)
     post_wg.Wait()
   }else {
-    fmt.Println("Error",session.Error)
+    fmt.Printf("\nLogin Failed for %v Error: %v \n",user.UserName,session.Error)
   }
 }
 
@@ -216,17 +214,17 @@ func (user *User)ScenarioTwoFlow(scenario_2_wg *sync.WaitGroup) {
   var session UserSession
   session.Login(user.UserName, password)
   if len(session.Error) == 0 {
-    post_wg.Add(1)
-    go session.SearchFeed(&post_wg)
+    post_wg.Add(2)
+    go session.SearchFeed(&post_wg,"public")
+    go session.SearchFeed(&post_wg,"feed")
     post_wg.Wait()
   }else{
-    fmt.Println("Error",session.Error)
+    fmt.Printf("\nLogin Failed for %v Error: %v \n",user.UserName,session.Error)
   }
 }
 
 // Login user name
 func (s *UserSession) Login(username string,pwd string) {
-  PrintSatement(fmt.Sprintf("User %v Login",username))
   var r RequestSetup
   r.UserName = username
   r.Password = pwd
@@ -247,7 +245,6 @@ func (s *UserSession) Login(username string,pwd string) {
     if err = json.Unmarshal([]byte(body), &s); err != nil {
           panic(err)
       }
-    fmt.Println(s)
   }
 }
 
@@ -273,7 +270,7 @@ func (s *UserSession) CommentTrigger(go_wg *sync.WaitGroup) {
 
 //
 func (s *UserSession) NewPost(post_wg *sync.WaitGroup ) {
-  PrintSatement("Post Create")
+  fmt.Println("Adding New Post")
   defer post_wg.Done()
   var r RequestSetup
   r.Url = fmt.Sprintf("%s/users/%v/posts/new",config.EnvConvig.BaseUri,s.UserId)
@@ -290,15 +287,15 @@ func (s *UserSession) NewPost(post_wg *sync.WaitGroup ) {
     if err = json.Unmarshal([]byte(body), &p); err != nil {
           panic(err)
       }
-    fmt.Println(p)
     // s.Post = p
     UploadVideo(VideoUrl,p.PostVideoUri)
   }
+  fmt.Println("Post Create Completed")
 }
 
 func (s *UserSession) NewComment(comment_wg *sync.WaitGroup) {
   defer comment_wg.Done()
-  PrintSatement("Create Comment")
+  fmt.Println("Adding New Comment")
   var r RequestSetup
   r.Url = fmt.Sprintf("%s/users/%v/posts/%v/comments/new",config.EnvConvig.BaseUri,s.UserId,s.Post.PostId)
   params := map[string]string{}
@@ -318,11 +315,13 @@ func (s *UserSession) NewComment(comment_wg *sync.WaitGroup) {
     s.Comment = c
     UploadVideo(VideoUrl,c.CommentVideoUri)
   }
+  fmt.Println("Adding Create Comment")
+
 }
 
 // Search published posts
 func (s *UserSession) SearchPublishedPost()([]Post){
-  PrintSatement("Search Post")
+  fmt.Println("Search Published Post Started")
   var p PostSearch
   var r RequestSetup
   r.Url = fmt.Sprintf("%v/posts/published_post_search",config.EnvConvig.BaseUri)
@@ -339,18 +338,18 @@ func (s *UserSession) SearchPublishedPost()([]Post){
     if err = json.Unmarshal([]byte(body), &p); err != nil {
       panic(err)
     }
-    fmt.Println(p)
   }
+  fmt.Println("retrun Search Published Posts")
   return p.Posts
 }
 
 // Search published posts
-func (s *UserSession) SearchFeed(go_wg *sync.WaitGroup) {
+func (s *UserSession) SearchFeed(go_wg *sync.WaitGroup,feed_type string) {
   defer go_wg.Done()
-  PrintSatement("Search Post")
+  fmt.Printf("\n Search %v Feed \n Started",feed_type)
   var p PostSearch
   var r RequestSetup
-  r.Url = fmt.Sprintf("%v/users/%v/public",config.EnvConvig.BaseUri,s.UserId)
+  r.Url = fmt.Sprintf("%v/users/%v/%v",config.EnvConvig.BaseUri,s.UserId,feed_type)
   fmt.Println(r.Url)
   params := map[string]string{}
   data,_ := json.Marshal(params)
@@ -364,13 +363,13 @@ func (s *UserSession) SearchFeed(go_wg *sync.WaitGroup) {
     if err = json.Unmarshal([]byte(body), &p); err != nil {
       panic(err)
     }
-    fmt.Println(p)
   }
+  fmt.Printf("\n Search %v Feed Completed\n",feed_type)
 }
 
 // Search users
 func (s *UserSession) SearchUser(limit string){
-  PrintSatement("User Search")
+  fmt.Println("User Search Started")
   var r RequestSetup
   r.Url = fmt.Sprintf("%v/users/public/user_search?limit=%v",config.EnvConvig.BaseUri,limit)
   params := map[string]string{}
@@ -387,8 +386,8 @@ func (s *UserSession) SearchUser(limit string){
       panic(err)
     }
     login_users =  u.Users
-    fmt.Println(u)
   }
+  fmt.Println("User Search Completed")
 }
 
 
@@ -414,12 +413,12 @@ func (r *RequestSetup)BuildHeader(req *http.Request) {
   req.Header.Set("X-Api-Key", app_config.ApiKey)
   req.Header.Set("X-Api-Nonce", nonce)
   req.Header.Set("Authorization",auth_key)
-  fmt.Println("~~~~~~~~~~~~~~Headers~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-  fmt.Println("Authorization",auth_key)
-  fmt.Println("X-Api-Nonce",nonce)
-  fmt.Println("X-Api-Key",app_config.ApiKey)
-  fmt.Println("X-Session-ID",r.SessionId)
-  fmt.Println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+  // fmt.Println("~~~~~~~~~~~~~~Headers~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+  // fmt.Println("Authorization",auth_key)
+  // fmt.Println("X-Api-Nonce",nonce)
+  // fmt.Println("X-Api-Key",app_config.ApiKey)
+  // fmt.Println("X-Session-ID",r.SessionId)
+  // fmt.Println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
   if r.SessionId != "" {
     req.Header.Set("X-Session-ID",r.SessionId)
   }
@@ -427,10 +426,10 @@ func (r *RequestSetup)BuildHeader(req *http.Request) {
 
 
 func UploadVideo(file_path string, url_string string){
-  PrintSatement("Uploading")
+  fmt.Println("Uploading start")
   uri,_ := url.Parse(url_string)
-  fmt.Println(sh.Command("curl", "-X", "PUT", "-T",  file_path, uri.String()).Run())
-  PrintSatement("Upload Finished")
+  fmt.Println("Upload error: \n",sh.Command("curl", "-X", "PUT", "-T",  file_path, uri.String()).Run())
+  fmt.Println("Upload Finished")
 
 }
 
@@ -442,10 +441,9 @@ func PrintSatement(val string) {
 
 func (r *RequestSetup) DoGet() (*http.Response,error){
   // defer base_wg.Done()
-  PrintSatement("Get Request == -- url "+r.Url)
+  fmt.Println("Get Request == -- url "+r.Url)
   client := &http.Client{}
   req, _ := http.NewRequest("GET", r.Url, nil)
-  fmt.Println("%T",req)
   if r.SkipHeader != true{
     r.BuildHeader(req)
   }
@@ -456,7 +454,7 @@ func (r *RequestSetup) DoGet() (*http.Response,error){
 
 func (r *RequestSetup) DoPost() (*http.Response,error){
   client := &http.Client{}
-  PrintSatement("Post Request == -- url "+r.Url)
+  fmt.Println("Post Request == -- url "+r.Url)
   req, _ := http.NewRequest("POST", r.Url,  bytes.NewBufferString(r.Params))
   req.Header.Set("Content-Type", "application/json")
   if r.SkipHeader != true{
