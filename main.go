@@ -16,7 +16,7 @@ var method = kingpin.Flag("method","Specify an Method Goging to be use").String(
 func main() {
   kingpin.Parse()
   video_path,_ := os.Getwd()
-  video_path += "/videos/gyro_toy.mp4"
+  video_path += "/videos/SampleVideo_1280x720_1mb.mp4"
   jurniapi_v2_client.StepUp(*environment, *concurrency,video_path,*method)
 }
 
