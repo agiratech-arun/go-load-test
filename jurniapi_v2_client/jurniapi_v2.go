@@ -28,6 +28,8 @@ var key = "8YHsvw7fuylbLr5FevrFAsRC/v2sH5X8i9aWODH76908GxhIE/+jDj0cVJft+zTx2WkQm
 var VideoUrl = ""
 var username = "jurni_test0"
 var password = "jurni123"
+var post_concurrency = 1
+var comment_concurrency = 1
 
 type Config struct {
   EnvVariable string
@@ -125,10 +127,10 @@ func StepUp(env string, concurrency int, video_path string,method_name string) {
   config.Register()
   switch method_name {
     case "scenario_1":
-      ScenarioOne(concurrency,username,strconv.Itoa(concurrency),"0")
+      ScenarioOne(concurrency,strconv.Itoa(concurrency))
       break;
     case "scenario_2":
-      // ScenarioTwo(Concurrency)
+      ScenarioTwo(concurrency,strconv.Itoa(concurrency))
       break;
     default:
       fmt.Println("\n=============================================================================")
@@ -159,20 +161,37 @@ func (c *Config)Register() {
 }
 
 
-func ScenarioOne(n int,username string, limit string,offset string) {
+func ScenarioOne(n int, limit string) {
   PrintSatement("Scenario One")
   var scenario_1_wg sync.WaitGroup
   var s UserSession
   s.Login(username,password)
-  s.UserSearch(username,limit,offset)
+  s.SearchUser(limit)
   posts := s.SearchPublishedPost()
   for _,user := range login_users {
     scenario_1_wg.Add(1)
     rand.Seed(time.Now().UTC().UnixNano())
     post := posts[rand.Intn(len(posts))]
-    go user.ScenarioOneFlow(&scenario_1_wg, post)
+    new_user := user
+    go new_user.ScenarioOneFlow(&scenario_1_wg, post)
   }
   scenario_1_wg.Wait()
+
+}
+
+func ScenarioTwo(n int, limit string) {
+  PrintSatement("Scenario Two")
+  var feed_metric_wg sync.WaitGroup
+  var s UserSession
+  s.Login(username,password)
+  s.SearchUser(limit)
+  fmt.Println("Login Users",len(login_users))
+  for _,user := range login_users {
+    feed_metric_wg.Add(1)
+    new_user := user
+    go new_user.ScenarioTwoFlow(&feed_metric_wg)
+  }
+  feed_metric_wg.Wait()
 }
 
 func (user *User)ScenarioOneFlow(scenario_1_wg *sync.WaitGroup, post Post) {
@@ -181,10 +200,28 @@ func (user *User)ScenarioOneFlow(scenario_1_wg *sync.WaitGroup, post Post) {
   var session UserSession
   session.Post = post
   session.Login(user.UserName, password)
-  post_wg.Add(2)
-  go session.PostTrigger(&post_wg)
-  go session.CommentTrigger(&post_wg)
-  post_wg.Wait()
+  if len(session.Error) == 0 {
+    post_wg.Add(2)
+    go session.PostTrigger(&post_wg)
+    go session.CommentTrigger(&post_wg)
+    post_wg.Wait()
+  }else {
+    fmt.Println("Error",session.Error)
+  }
+}
+
+func (user *User)ScenarioTwoFlow(scenario_2_wg *sync.WaitGroup) {
+  defer scenario_2_wg.Done()
+  var post_wg sync.WaitGroup
+  var session UserSession
+  session.Login(user.UserName, password)
+  if len(session.Error) == 0 {
+    post_wg.Add(1)
+    go session.SearchFeed(&post_wg)
+    post_wg.Wait()
+  }else{
+    fmt.Println("Error",session.Error)
+  }
 }
 
 // Login user name
@@ -217,7 +254,7 @@ func (s *UserSession) Login(username string,pwd string) {
 func (s *UserSession) PostTrigger(go_wg *sync.WaitGroup) {
   defer go_wg.Done()
   var post_wg sync.WaitGroup
-  for i:=0;i<config.Concurrency;i++ {
+  for i:=0;i<post_concurrency;i++ {
     post_wg.Add(1)
     go s.NewPost(&post_wg)
   }
@@ -227,7 +264,7 @@ func (s *UserSession) PostTrigger(go_wg *sync.WaitGroup) {
 func (s *UserSession) CommentTrigger(go_wg *sync.WaitGroup) {
   defer go_wg.Done()
   var comment_wg sync.WaitGroup
-  for i:=0;i<config.Concurrency;i++ {
+  for i:=0;i<comment_concurrency;i++ {
     comment_wg.Add(1)
     go s.NewComment(&comment_wg)
   }
@@ -259,7 +296,7 @@ func (s *UserSession) NewPost(post_wg *sync.WaitGroup ) {
   }
 }
 
-func (s *UserSession) NewComment(comment_wg *sync.WaitGroup ) {
+func (s *UserSession) NewComment(comment_wg *sync.WaitGroup) {
   defer comment_wg.Done()
   PrintSatement("Create Comment")
   var r RequestSetup
@@ -308,7 +345,8 @@ func (s *UserSession) SearchPublishedPost()([]Post){
 }
 
 // Search published posts
-func (s *UserSession) SearchFeed()([]Post){
+func (s *UserSession) SearchFeed(go_wg *sync.WaitGroup) {
+  defer go_wg.Done()
   PrintSatement("Search Post")
   var p PostSearch
   var r RequestSetup
@@ -328,14 +366,13 @@ func (s *UserSession) SearchFeed()([]Post){
     }
     fmt.Println(p)
   }
-  return p.Posts
 }
 
 // Search users
-func (s *UserSession) UserSearch(keyword string,limit string,offset string){
+func (s *UserSession) SearchUser(limit string){
   PrintSatement("User Search")
   var r RequestSetup
-  r.Url = fmt.Sprintf("%v/users/search?keyword=%v&limit=%v&offset=%v",config.EnvConvig.BaseUri,keyword,limit,offset)
+  r.Url = fmt.Sprintf("%v/users/public/user_search?limit=%v",config.EnvConvig.BaseUri,limit)
   params := map[string]string{}
   data,_ := json.Marshal(params)
   r.Params = string(data)
@@ -350,6 +387,7 @@ func (s *UserSession) UserSearch(keyword string,limit string,offset string){
       panic(err)
     }
     login_users =  u.Users
+    fmt.Println(u)
   }
 }
 
@@ -392,6 +430,8 @@ func UploadVideo(file_path string, url_string string){
   PrintSatement("Uploading")
   uri,_ := url.Parse(url_string)
   fmt.Println(sh.Command("curl", "-X", "PUT", "-T",  file_path, uri.String()).Run())
+  PrintSatement("Upload Finished")
+
 }
 
 func PrintSatement(val string) {

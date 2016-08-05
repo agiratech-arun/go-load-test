@@ -2,7 +2,7 @@ package main
 
 import (
   "gopkg.in/alecthomas/kingpin.v2"
-  "./jurniapi_v2_client"
+  "github.com/agiratech-arun/go-load-test/jurniapi_v2_client"
   "os"
   )
 
