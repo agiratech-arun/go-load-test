@@ -26,6 +26,8 @@ var app_config AppConfig
 
 var commenter UserSession
 
+var login_users []User
+
 var alpha = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
 var key = "8YHsvw7fuylbLr5FevrFAsRC/v2sH5X8i9aWODH76908GxhIE/+jDj0cVJft+zTx2WkQmxiGM06KAnBtG1C7gg=="
@@ -39,10 +41,16 @@ var password = ""
 type Config struct {
   EnvVariable string
   Concurrency int
-  PostConcurrency int
   EnvConvig EnvSetup
   RangeVaribales []string
   // AppConfig AppConfig
+}
+
+type User struct {
+  Status int
+  Error string `json:"error"`
+  UserId string `json:"user_id"`
+  UserName string `json:"username"`
 }
 
 
@@ -101,71 +109,39 @@ type Post struct {
   JobId string `json:"job_id"`
 }
 
-type TestRequest struct {
+type UserSearch struct {
   Status int
   Error string `json:"error"`
+  UserCount int `json:"num_users"`
+  Users []User `json:"users"`
 }
 
 
 // appliication starts here
-func StepUp(env string, no int, post_no int,pwd string) {
-  PrintSatement("Load Testing Steup")
-  VideoUrl = pwd
-  username = username
-  fmt.Println(username,password)
-  password = password
+func StepUp(env string, concurrency int, video_path string,method_name string) {
+  PrintSatement("Load Testing Setup")
+  if concurrency == 0 {
+    concurrency = 1
+  }
+  username := "jurni_test"
+  VideoUrl = video_path
   config.EnvVariable = env
-  config.Concurrency = no
-  config.PostConcurrency = post_no
+  config.Concurrency = concurrency
   config.ConfigSetup()
-  // config.TestGorotine()
   config.Register()
-  DumpUser(1)
-  // config.TriggerLoadTest()
-}
-
-
-
-func (c *Config)TriggerLoadTest() {
-  PrintSatement("Load Testing Started")
-  fmt.Println(VideoUrl)
-  // commenter.CommenterSignUp()
-  Concurrency()
-}
-
-func DumpUser(n int) {
-  config.Register()
-  var dump_wg sync.WaitGroup
-  for i:=0; i<n; i++ {
-    dump_wg.Add(1)
-    go UserSignUp(i, &dump_wg)
+  switch method_name {
+    case "scenario_1":
+      ScenarioOne(concurrency,username,strconv.Itoa(concurrency),"0")
+      break;
+    case "scenario_2":
+      // ScenarioTwo(Concurrency)
+      break;
+    default:
+      fmt.Println("Usange go run main.go --e #Environment --c #concurrency --method #method_name")
   }
+
 }
 
-
-func Concurrency() {
-  for i:=0;i<config.Concurrency;i++ {
-    var s UserSession
-    base_wg.Add(1)
-    go s.TrigegrConcurrency()
-  }
-  base_wg.Wait()
-}
-
-func (s *UserSession) TrigegrConcurrency() {
-  defer base_wg.Done()
-  // s.UserSignUp()
-  commenter.Login("arun_agira","jurni@123")
-  // s.Post.PostId = "57a1f75c69702d7c67360000"
-  // s.Fellow()
-  // fmt.Println("SessionId",s.SessionId)
-  // s.Login("pwXS-64863","jurni123")
-  // s.PostTrigger()
-  // s.ShowPost()
-  // commenter.Post = s.Post
-  commenter.Post.PostId = "57a2f71e69702d2c3b1e0000"
-  commenter.NewComment()
-}
 
 func (c *Config) ConfigSetup() {
   // c.RangeVaribales =
@@ -175,56 +151,16 @@ func (c *Config) ConfigSetup() {
     c.EnvConvig.BaseUri = "https://api-v2-staging.jurni.me/v2"
     c.EnvConvig.SSLCaFile = "/home/ubuntu/jurni_devops/conf/ssl/new/gd_bundle-g2-g1.crt"
   }else if c.EnvVariable == "production" {
-    c.EnvConvig.BaseUri = "https://api-v2.jurni.me/v2"
+    c.EnvConvig.BaseUri = "https://api-v2-staging.jurni.me/v2"
     c.EnvConvig.SSLCaFile = "/home/ubuntu/jurni_devops/conf/ssl/new/gd_bundle-g2-g1.crt"
   }else {
-     c.EnvConvig.BaseUri = "http://vpc-api-v2.jurni.me/v2"
+     c.EnvConvig.BaseUri = "http://api-v2-staging.jurni.me/v2"
+     // c.EnvConvig.SSLCaFile = "/home/ubuntu/jurni_devops/conf/ssl/new/gd_bundle-g2-g1.crt"
   }
 }
 
-func (c *Config) Test(){
-  fmt.Println("== Test:")
-}
 
 
-func (r *RequestSetup) DoGet() (*http.Response,error){
-  // defer base_wg.Done()
-  PrintSatement("Get Request == -- url "+r.Url)
-  client := &http.Client{}
-  req, _ := http.NewRequest("GET", r.Url, nil)
-  fmt.Println("%T",req)
-  if r.SkipHeader != true{
-    r.BuildHeader(req)
-  }
-  res, err := client.Do(req)
-  return res,err
-}
-
-
-func (r *RequestSetup) DoPost() (*http.Response,error){
-  client := &http.Client{}
-  PrintSatement("Post Request == -- url "+r.Url)
-  req, _ := http.NewRequest("POST", r.Url,  bytes.NewBufferString(r.Params))
-  req.Header.Set("Content-Type", "application/json")
-  if r.SkipHeader != true{
-    r.BuildHeader(req)
-  }
-  res, err := client.Do(req)
-  return res,err
-}
-
-// test the application to working
-func (c *Config)TestGorotine(){
-  PrintSatement("Api Test Goes")
-  fmt.Println("-- test starting")
-  var r RequestSetup
-  r.Url = config.EnvConvig.BaseUri + "/test"
-  for i:=0;i<c.Concurrency;i++ {
-    base_wg.Add(1)
-    go r.DoGet()
-  }
-  base_wg.Wait()
-}
 // registeration for app to get appkey and appid
 func (c *Config)Register() {
   PrintSatement("Api Key Register")
@@ -246,34 +182,26 @@ func (c *Config)Register() {
   }
 }
 
-// register a user based on appkey and appid
-func UserSignUp(i int, dump_wg *sync.WaitGroup){
-  defer dump_wg.Done()
-  PrintSatement("User SignUp")
-  index := strconv.Itoa(i)
-  params := map[string]string{
-    "username": "jurni_test"+index,
-    "password":  "jurni123",
-    "email": "jurni_test"+index + "@jurni.me",
-    "device_id": config.EnvConvig.DeviceId,
-  }
-  data,_ := json.Marshal(params)
 
-  var req RequestSetup
-  req.SkipHeader = false
-  req.Url = config.EnvConvig.BaseUri + "/signup"
-  req.Params = string(data)
-  response,err := req.DoPost()
-  if err != nil {
-    fmt.Printf("Error %s \n",err)
-  }else {
-    body, err := ioutil.ReadAll(response.Body)
-    var test_data interface{}
-    if err = json.Unmarshal([]byte(body), &test_data); err != nil {
-      panic(err)
-    }
-    fmt.Println(test_data)
+func ScenarioOne(n int,username string, limit string,offset string) {
+  PrintSatement("Scenario One")
+  var scenario_1_wg sync.WaitGroup
+  var s UserSession
+  s.Login("pwXS-64863","jurni123")
+  s.UserSearch(username,limit,offset)
+  for _,user := range login_users{
+    scenario_1_wg.Add(1)
+    go user.ScenarioOneFlow(&scenario_1_wg)
   }
+  scenario_1_wg.Wait()
+}
+
+func (u *User)ScenarioOneFlow(scenario_1_wg *sync.WaitGroup) {
+  defer scenario_1_wg.Done()
+  var s UserSession
+  s.Login("arun_agira","jurni@123")
+  s.PostTrigger()
+  s.CommentTrigger()
 }
 
 // Login user name
@@ -305,27 +233,20 @@ func (s *UserSession) Login(username string,pwd string) {
 
 func (s *UserSession) PostTrigger() {
   var post_wg sync.WaitGroup
-  for i:=0;i<config.PostConcurrency;i++ {
+  for i:=0;i<config.Concurrency;i++ {
     post_wg.Add(1)
     go s.NewPost(&post_wg)
   }
   post_wg.Wait()
 }
 
-func (s *UserSession) CommenterSignUp(){
-  PrintSatement("Commenter SignUp")
-  var r RequestSetup
-  r.SignUpParams()
-  response,err := r.DoPost()
-  if err != nil {
-    fmt.Printf("Error %s \n",err)
-  }else {
-    body, err := ioutil.ReadAll(response.Body)
-    if err = json.Unmarshal([]byte(body), &commenter); err != nil {
-          panic(err)
-      }
-    fmt.Println(commenter)
+func (s *UserSession) CommentTrigger() {
+  var comment_wg sync.WaitGroup
+  for i:=0;i<config.Concurrency;i++ {
+    comment_wg.Add(1)
+    go s.NewComment(&comment_wg)
   }
+  comment_wg.Wait()
 }
 
 //
@@ -354,7 +275,7 @@ func (s *UserSession) NewPost(post_wg *sync.WaitGroup ) {
 }
 
 
-func (s *UserSession) ShowPost(){
+func (s *UserSession) PostSearch(){
   p := s.Post
   PrintSatement("Show Post")
   var r RequestSetup
@@ -378,8 +299,8 @@ func (s *UserSession) ShowPost(){
   }
 }
 
-func (s *UserSession) NewComment() {
-  // defer post_wg.Done()
+func (s *UserSession) NewComment(comment_wg *sync.WaitGroup ) {
+  defer comment_wg.Done()
   PrintSatement("Create Comment")
   var r RequestSetup
   r.Url = fmt.Sprintf("%s/users/%v/posts/%v/comments/new",config.EnvConvig.BaseUri,s.UserId,s.Post.PostId)
@@ -402,24 +323,24 @@ func (s *UserSession) NewComment() {
   }
 }
 
-func (s *UserSession) Fellow () {
+func (s *UserSession) UserSearch(keyword string,limit string,offset string){
+  PrintSatement("User Search")
   var r RequestSetup
-  params := map[string]string{
-    "topic_spec": "all"}
-  r.Url = fmt.Sprintf("%v/users/%v/follow/%v",config.EnvConvig.BaseUri,s.UserId,"576cba2d69702d6518420000")
+  r.Url = fmt.Sprintf("%v/users/search?keyword=%v&limit=%v&offset=%v",config.EnvConvig.BaseUri,keyword,limit,offset)
+  params := map[string]string{}
   data,_ := json.Marshal(params)
   r.Params = string(data)
   r.SessionId = s.SessionId
-  response,err := r.DoPost()
+  response,err := r.DoGet()
   if err != nil {
     fmt.Printf("Error %s \n",err)
   }else {
     body, err := ioutil.ReadAll(response.Body)
-    var test_data interface{}
-    if err = json.Unmarshal([]byte(body), &test_data); err != nil {
+    var u UserSearch
+    if err = json.Unmarshal([]byte(body), &u); err != nil {
       panic(err)
     }
-    fmt.Println(test_data)
+    login_users =  u.Users
   }
 }
 
@@ -446,39 +367,21 @@ func (r *RequestSetup)BuildHeader(req *http.Request) {
   req.Header.Set("X-Api-Key", app_config.ApiKey)
   req.Header.Set("X-Api-Nonce", nonce)
   req.Header.Set("Authorization",auth_key)
-  fmt.Println("~~~~~~~~~~~~~~Headers~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-  fmt.Println("Authorization",auth_key)
-  fmt.Println("X-Api-Nonce",nonce)
-  fmt.Println("X-Api-Key",app_config.ApiKey)
-  fmt.Println("X-Session-ID",r.SessionId)
-  fmt.Println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+  // fmt.Println("~~~~~~~~~~~~~~Headers~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+  // fmt.Println("Authorization",auth_key)
+  // fmt.Println("X-Api-Nonce",nonce)
+  // fmt.Println("X-Api-Key",app_config.ApiKey)
+  // fmt.Println("X-Session-ID",r.SessionId)
+  // fmt.Println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
   if r.SessionId != "" {
     req.Header.Set("X-Session-ID",r.SessionId)
   }
 }
 
-func (r *RequestSetup) SignUpParams() {
-  rand.Seed(time.Now().UTC().UnixNano())
-  rand_num := 10000 + rand.Intn(89999)
-  r.UserName = fmt.Sprintf("%v-%v",srand(4),strconv.Itoa(rand_num))
-  r.Password = "jurni123"
-  r.Email = fmt.Sprintf("vivek+%v-%v@jurni.me",srand(8),strconv.Itoa(rand_num))
-  r.SkipHeader = false
-  r.Url = config.EnvConvig.BaseUri + "/signup"
-  params := map[string]string{
-    "username": r.UserName,
-    "password":   r.Password,
-    "email": r.Email,
-    "device_id": config.EnvConvig.DeviceId,
-  }
-  data,_ := json.Marshal(params)
-  r.Params = string(data)
-}
 
 func UploadVideo(file_path string, url_string string){
   PrintSatement("Uploading")
   uri,_ := url.Parse(url_string)
-  // comment := fmt.Sprintf("curl -X PUT -T %v '%v'",VideoUrl,uri.String())
   fmt.Println(sh.Command("curl", "-X", "PUT", "-T",  file_path, uri.String()).Run())
 }
 
@@ -486,4 +389,30 @@ func PrintSatement(val string) {
   fmt.Printf("\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++\n")
   fmt.Printf("    %v    ",val)
   fmt.Printf("\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
+}
+
+func (r *RequestSetup) DoGet() (*http.Response,error){
+  // defer base_wg.Done()
+  PrintSatement("Get Request == -- url "+r.Url)
+  client := &http.Client{}
+  req, _ := http.NewRequest("GET", r.Url, nil)
+  fmt.Println("%T",req)
+  if r.SkipHeader != true{
+    r.BuildHeader(req)
+  }
+  res, err := client.Do(req)
+  return res,err
+}
+
+
+func (r *RequestSetup) DoPost() (*http.Response,error){
+  client := &http.Client{}
+  PrintSatement("Post Request == -- url "+r.Url)
+  req, _ := http.NewRequest("POST", r.Url,  bytes.NewBufferString(r.Params))
+  req.Header.Set("Content-Type", "application/json")
+  if r.SkipHeader != true{
+    r.BuildHeader(req)
+  }
+  res, err := client.Do(req)
+  return res,err
 }
