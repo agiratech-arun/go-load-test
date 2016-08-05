@@ -105,6 +105,13 @@ type UserSearch struct {
   Users []User `json:"users"`
 }
 
+type PostSearch struct {
+  Status int `json:"status"`
+  Error string `json:"error"`
+  PostCount int `json:"num_posts"`
+  Posts []Post `json:"posts"`
+}
+
 // appliication starts here
 func StepUp(env string, concurrency int, video_path string,method_name string) {
   PrintSatement("Load Testing Setup")
@@ -128,7 +135,6 @@ func StepUp(env string, concurrency int, video_path string,method_name string) {
       fmt.Println("Usange go run main.go --e #Environment --c #concurrency --method #method_name")
       fmt.Println("=============================================================================\n")
   }
-
 }
 
 // registeration for app to get appkey and appid
@@ -159,19 +165,26 @@ func ScenarioOne(n int,username string, limit string,offset string) {
   var s UserSession
   s.Login(username,password)
   s.UserSearch(username,limit,offset)
+  posts := s.SearchPublishedPost()
   for _,user := range login_users {
     scenario_1_wg.Add(1)
-    go user.ScenarioOneFlow(&scenario_1_wg)
+    rand.Seed(time.Now().UTC().UnixNano())
+    post := posts[rand.Intn(len(posts))]
+    go user.ScenarioOneFlow(&scenario_1_wg, post)
   }
   scenario_1_wg.Wait()
 }
 
-func (user *User)ScenarioOneFlow(scenario_1_wg *sync.WaitGroup) {
+func (user *User)ScenarioOneFlow(scenario_1_wg *sync.WaitGroup, post Post) {
   defer scenario_1_wg.Done()
+  var post_wg sync.WaitGroup
   var session UserSession
+  session.Post = post
   session.Login(user.UserName, password)
-  // session.PostTrigger()
-  // session.CommentTrigger()
+  post_wg.Add(2)
+  go session.PostTrigger(&post_wg)
+  go session.CommentTrigger(&post_wg)
+  post_wg.Wait()
 }
 
 // Login user name
@@ -201,7 +214,8 @@ func (s *UserSession) Login(username string,pwd string) {
   }
 }
 
-func (s *UserSession) PostTrigger() {
+func (s *UserSession) PostTrigger(go_wg *sync.WaitGroup) {
+  defer go_wg.Done()
   var post_wg sync.WaitGroup
   for i:=0;i<config.Concurrency;i++ {
     post_wg.Add(1)
@@ -210,7 +224,8 @@ func (s *UserSession) PostTrigger() {
   post_wg.Wait()
 }
 
-func (s *UserSession) CommentTrigger() {
+func (s *UserSession) CommentTrigger(go_wg *sync.WaitGroup) {
+  defer go_wg.Done()
   var comment_wg sync.WaitGroup
   for i:=0;i<config.Concurrency;i++ {
     comment_wg.Add(1)
@@ -239,33 +254,8 @@ func (s *UserSession) NewPost(post_wg *sync.WaitGroup ) {
           panic(err)
       }
     fmt.Println(p)
-    s.Post = p
+    // s.Post = p
     UploadVideo(VideoUrl,p.PostVideoUri)
-  }
-}
-
-
-func (s *UserSession) PostSearch(){
-  p := s.Post
-  PrintSatement("Show Post")
-  var r RequestSetup
-  r.Url = fmt.Sprintf("%v/users/%v/posts/%v",config.EnvConvig.BaseUri,s.UserId,p.PostId)
-  params := map[string]string{}
-  data,_ := json.Marshal(params)
-  r.Params = string(data)
-  response,err := r.DoGet()
-  if err != nil {
-    fmt.Printf("Error %s \n",err)
-  }else {
-    var p Post
-    body, err := ioutil.ReadAll(response.Body)
-    if err = json.Unmarshal([]byte(body), &p); err != nil {
-          panic(err)
-      }
-    fmt.Println(p)
-    s.Post = p
-    UploadVideo(VideoUrl,p.PostVideoUri)
-    // s.Fellow()
   }
 }
 
@@ -293,6 +283,55 @@ func (s *UserSession) NewComment(comment_wg *sync.WaitGroup ) {
   }
 }
 
+// Search published posts
+func (s *UserSession) SearchPublishedPost()([]Post){
+  PrintSatement("Search Post")
+  var p PostSearch
+  var r RequestSetup
+  r.Url = fmt.Sprintf("%v/posts/published_post_search",config.EnvConvig.BaseUri)
+  fmt.Println(r.Url)
+  params := map[string]string{}
+  data,_ := json.Marshal(params)
+  r.Params = string(data)
+  r.SessionId = s.SessionId
+  response,err := r.DoGet()
+  if err != nil {
+    fmt.Printf("Error %s \n",err)
+  }else {
+    body, err := ioutil.ReadAll(response.Body)
+    if err = json.Unmarshal([]byte(body), &p); err != nil {
+      panic(err)
+    }
+    fmt.Println(p)
+  }
+  return p.Posts
+}
+
+// Search published posts
+func (s *UserSession) SearchFeed()([]Post){
+  PrintSatement("Search Post")
+  var p PostSearch
+  var r RequestSetup
+  r.Url = fmt.Sprintf("%v/users/%v/public",config.EnvConvig.BaseUri,s.UserId)
+  fmt.Println(r.Url)
+  params := map[string]string{}
+  data,_ := json.Marshal(params)
+  r.Params = string(data)
+  r.SessionId = s.SessionId
+  response,err := r.DoGet()
+  if err != nil {
+    fmt.Printf("Error %s \n",err)
+  }else {
+    body, err := ioutil.ReadAll(response.Body)
+    if err = json.Unmarshal([]byte(body), &p); err != nil {
+      panic(err)
+    }
+    fmt.Println(p)
+  }
+  return p.Posts
+}
+
+// Search users
 func (s *UserSession) UserSearch(keyword string,limit string,offset string){
   PrintSatement("User Search")
   var r RequestSetup
@@ -337,12 +376,12 @@ func (r *RequestSetup)BuildHeader(req *http.Request) {
   req.Header.Set("X-Api-Key", app_config.ApiKey)
   req.Header.Set("X-Api-Nonce", nonce)
   req.Header.Set("Authorization",auth_key)
-  // fmt.Println("~~~~~~~~~~~~~~Headers~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-  // fmt.Println("Authorization",auth_key)
-  // fmt.Println("X-Api-Nonce",nonce)
-  // fmt.Println("X-Api-Key",app_config.ApiKey)
-  // fmt.Println("X-Session-ID",r.SessionId)
-  // fmt.Println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+  fmt.Println("~~~~~~~~~~~~~~Headers~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+  fmt.Println("Authorization",auth_key)
+  fmt.Println("X-Api-Nonce",nonce)
+  fmt.Println("X-Api-Key",app_config.ApiKey)
+  fmt.Println("X-Session-ID",r.SessionId)
+  fmt.Println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
   if r.SessionId != "" {
     req.Header.Set("X-Session-ID",r.SessionId)
   }
