@@ -19,31 +19,21 @@ import (
        )
 
 var base_wg sync.WaitGroup
-
 var config Config
-
 var app_config AppConfig
-
 var commenter UserSession
-
 var login_users []User
-
 var alpha = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-
 var key = "8YHsvw7fuylbLr5FevrFAsRC/v2sH5X8i9aWODH76908GxhIE/+jDj0cVJft+zTx2WkQmxiGM06KAnBtG1C7gg=="
-
 var VideoUrl = ""
-
-var username = ""
-
-var password = ""
+var username = "jurni_test0"
+var password = "jurni123"
 
 type Config struct {
   EnvVariable string
   Concurrency int
   EnvConvig EnvSetup
   RangeVaribales []string
-  // AppConfig AppConfig
 }
 
 type User struct {
@@ -52,7 +42,6 @@ type User struct {
   UserId string `json:"user_id"`
   UserName string `json:"username"`
 }
-
 
 type UserSession struct {
   Status int
@@ -116,14 +105,12 @@ type UserSearch struct {
   Users []User `json:"users"`
 }
 
-
 // appliication starts here
 func StepUp(env string, concurrency int, video_path string,method_name string) {
   PrintSatement("Load Testing Setup")
   if concurrency == 0 {
     concurrency = 1
   }
-  username := "jurni_test"
   VideoUrl = video_path
   config.EnvVariable = env
   config.Concurrency = concurrency
@@ -143,25 +130,6 @@ func StepUp(env string, concurrency int, video_path string,method_name string) {
   }
 
 }
-
-
-func (c *Config) ConfigSetup() {
-  // c.RangeVaribales =
-  PrintSatement("Env Configuration")
-  c.EnvConvig.DeviceId = srand(64)
-  if c.EnvVariable == "staging" {
-    c.EnvConvig.BaseUri = "https://api-v2-staging.jurni.me/v2"
-    c.EnvConvig.SSLCaFile = "/home/ubuntu/jurni_devops/conf/ssl/new/gd_bundle-g2-g1.crt"
-  }else if c.EnvVariable == "production" {
-    c.EnvConvig.BaseUri = "https://api-v2-staging.jurni.me/v2"
-    c.EnvConvig.SSLCaFile = "/home/ubuntu/jurni_devops/conf/ssl/new/gd_bundle-g2-g1.crt"
-  }else {
-     c.EnvConvig.BaseUri = "http://api-v2-staging.jurni.me/v2"
-     // c.EnvConvig.SSLCaFile = "/home/ubuntu/jurni_devops/conf/ssl/new/gd_bundle-g2-g1.crt"
-  }
-}
-
-
 
 // registeration for app to get appkey and appid
 func (c *Config)Register() {
@@ -189,21 +157,21 @@ func ScenarioOne(n int,username string, limit string,offset string) {
   PrintSatement("Scenario One")
   var scenario_1_wg sync.WaitGroup
   var s UserSession
-  s.Login("pwXS-64863","jurni123")
+  s.Login(username,password)
   s.UserSearch(username,limit,offset)
-  for _,user := range login_users{
+  for _,user := range login_users {
     scenario_1_wg.Add(1)
     go user.ScenarioOneFlow(&scenario_1_wg)
   }
   scenario_1_wg.Wait()
 }
 
-func (u *User)ScenarioOneFlow(scenario_1_wg *sync.WaitGroup) {
+func (user *User)ScenarioOneFlow(scenario_1_wg *sync.WaitGroup) {
   defer scenario_1_wg.Done()
-  var s UserSession
-  s.Login("arun_agira","jurni@123")
-  s.PostTrigger()
-  s.CommentTrigger()
+  var session UserSession
+  session.Login(user.UserName, password)
+  // session.PostTrigger()
+  // session.CommentTrigger()
 }
 
 // Login user name
@@ -417,4 +385,20 @@ func (r *RequestSetup) DoPost() (*http.Response,error){
   }
   res, err := client.Do(req)
   return res,err
+}
+
+func (c *Config) ConfigSetup() {
+  // c.RangeVaribales =
+  PrintSatement("Env Configuration")
+  c.EnvConvig.DeviceId = srand(64)
+  if c.EnvVariable == "staging" {
+    c.EnvConvig.BaseUri = "http://api-v2-staging.jurni.me/v2"
+    // c.EnvConvig.SSLCaFile = "/home/ubuntu/jurni_devops/conf/ssl/new/gd_bundle-g2-g1.crt"
+  }else if c.EnvVariable == "production" {
+    c.EnvConvig.BaseUri = "http://api-v2-staging.jurni.me/v2"
+    // c.EnvConvig.SSLCaFile = "/home/ubuntu/jurni_devops/conf/ssl/new/gd_bundle-g2-g1.crt"
+  }else {
+     c.EnvConvig.BaseUri = "http://api-v2-staging.jurni.me/v2"
+     // c.EnvConvig.SSLCaFile = "/home/ubuntu/jurni_devops/conf/ssl/new/gd_bundle-g2-g1.crt"
+  }
 }
