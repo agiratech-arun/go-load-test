@@ -137,7 +137,9 @@ func StepUp(env string, concurrency int, video_path string,method_name string) {
       // ScenarioTwo(Concurrency)
       break;
     default:
+      fmt.Println("\n=============================================================================")
       fmt.Println("Usange go run main.go --e #Environment --c #concurrency --method #method_name")
+      fmt.Println("=============================================================================\n")
   }
 
 }
